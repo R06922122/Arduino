@@ -1,13 +1,8 @@
+
 #include "I2Cdev.h"
 #include "MPU6050.h"
 #include <MFRC522.h>
 #include <require_cpp11.h>
-
-/*
-     0 for ACC system
-     1 for FC-51 system
-*/
-#define SYSTEM 1
 
 // debug log flag
 #define SHOW_ACC 0
@@ -27,27 +22,13 @@ byte Legal_id[4] = {0xF2, 0x86, 0xFC, 0x16};
 #define LED_PIN_BIKE_RUN 4
 #define LED_PIN_UNLOCK 3 // Unlock LED
 
-// class default I2C address is 0x68
-// specific I2C addresses may be passed as a parameter here
-// AD0 low = 0x68 (default for InvenSense evaluation board)
-// AD0 high = 0x69
-#if !SYSTEM
-MPU6050 accelgyro;
-#endif
 //MPU6050 accelgyro(0x69); // <-- use for AD0 high
 
 // 0 for BIKE STOP
 // 1 for BIKE RUNNING
 int State = 1;
 
-#if SYSTEM // use FC-51
-int globalDect;
-#else
-int16_t ax, ay, az;
-int16_t gx, gy, gz;
-int16_t Pre_xyz[3];  // Previous x, y, z acceleration
-int16_t Preg_xyz[3]; // Previous gx, gy, gz acceleration
-#endif // SYSTEM
+int globalDect = 2;
 
 /* steper PIN */
 int Pin1 = 8; //<--STEPPER PIN
@@ -57,121 +38,108 @@ int Pin4 = 5; //<--STEPPER PIN
 
 /* system/debug used var */
 int count = 0;
-#if SYSTEM
-int Wait = 30000;
-#else
-int Wait = 6000;
-#endif
+int Wait = 10000;
 int countI = 0;
 int countJ = 0;
-
+int lockAngle = 1500;
 /* TODO: Using RFID-key */
-void Unlock()
-{
-     Serial.print("[LockLater]: U shall pass!!!\n");
-     for (size_t i = 0; i < 100; i++)
-     {
-          digitalWrite(Pin1, HIGH);
-          digitalWrite(Pin2, LOW);
-          digitalWrite(Pin3, LOW);
-          digitalWrite(Pin4, LOW);
-          delay(1);
-          digitalWrite(Pin1, HIGH);
-          digitalWrite(Pin2, HIGH);
-          digitalWrite(Pin3, LOW);
-          digitalWrite(Pin4, LOW);
-          delay(1);
-          digitalWrite(Pin1, LOW);
-          digitalWrite(Pin2, HIGH);
-          digitalWrite(Pin3, LOW);
-          digitalWrite(Pin4, LOW);
-          delay(1);
-          digitalWrite(Pin1, LOW);
-          digitalWrite(Pin2, HIGH);
-          digitalWrite(Pin3, HIGH);
-          digitalWrite(Pin4, LOW);
-          delay(1);
-          digitalWrite(Pin1, LOW);
-          digitalWrite(Pin2, LOW);
-          digitalWrite(Pin3, HIGH);
-          digitalWrite(Pin4, LOW);
-          delay(1);
-          digitalWrite(Pin1, LOW);
-          digitalWrite(Pin2, LOW);
-          digitalWrite(Pin3, HIGH);
-          digitalWrite(Pin4, HIGH);
-          delay(1);
-          digitalWrite(Pin1, LOW);
-          digitalWrite(Pin2, LOW);
-          digitalWrite(Pin3, LOW);
-          digitalWrite(Pin4, HIGH);
-          delay(1);
-          digitalWrite(Pin1, LOW);
-          digitalWrite(Pin2, LOW);
-          digitalWrite(Pin3, HIGH);
-          digitalWrite(Pin4, HIGH);
-          delay(1);
-          digitalWrite(Pin1, LOW);
-          digitalWrite(Pin2, LOW);
-          digitalWrite(Pin3, LOW);
-          digitalWrite(Pin4, LOW);
-     }
-     State = 1;
-}
 
 /* steper_rotation */
 // TODO: set the right angle for steper_rotationer
-void steper_rotation()
+void steper_rotation(bool dir)
 {
+     digitalWrite(LED_PIN_UNLOCK, 1);
+     int _step = 0;
      Serial.print("LockLater Start!!! \n");
-     for (size_t i = 0; i < 100; i++)
+     for (size_t i = 0; i < lockAngle; i++)
      {
-          digitalWrite(Pin1, LOW);
-          digitalWrite(Pin2, LOW);
-          digitalWrite(Pin3, LOW);
-          digitalWrite(Pin4, HIGH);
+          switch (_step)
+          {
+          case 0:
+               digitalWrite(Pin1, 0);
+               digitalWrite(Pin2, 0);
+               digitalWrite(Pin3, 0);
+               digitalWrite(Pin4, 1);
+               //1
+               break;
+          case 1:
+               digitalWrite(Pin1, 0);
+               digitalWrite(Pin2, 0);
+               digitalWrite(Pin3, 1);
+               digitalWrite(Pin4, 1);
+               //2
+               break;
+          case 2:
+               digitalWrite(Pin1, 0);
+               digitalWrite(Pin2, 0);
+               digitalWrite(Pin3, 1);
+               digitalWrite(Pin4, 0);
+               //3
+               break;
+
+          case 3:
+               digitalWrite(Pin1, 0);
+               digitalWrite(Pin2, 1);
+               digitalWrite(Pin3, 1);
+               digitalWrite(Pin4, 0);
+               //4
+               break;
+          case 4:
+               digitalWrite(Pin1, 0);
+               digitalWrite(Pin2, 1);
+               digitalWrite(Pin3, 0);
+               digitalWrite(Pin4, 0);
+               //7
+               break;
+          case 5:
+               digitalWrite(Pin1, 1);
+               digitalWrite(Pin2, 1);
+               digitalWrite(Pin3, 0);
+               digitalWrite(Pin4, 0);
+               //8
+               break;
+          case 6:
+               digitalWrite(Pin1, 1);
+               digitalWrite(Pin2, 0);
+               digitalWrite(Pin3, 0);
+               digitalWrite(Pin4, 0);
+               //15
+               break;
+          case 7:
+               digitalWrite(Pin1, 1);
+               digitalWrite(Pin2, 0);
+               digitalWrite(Pin3, 0);
+               digitalWrite(Pin4, 1);
+               //14
+               break;
+          default:
+               digitalWrite(Pin1, 0);
+               digitalWrite(Pin2, 0);
+               digitalWrite(Pin3, 0);
+               digitalWrite(Pin4, 0);
+               //0
+               break;
+          }
+          if (dir)
+          {
+               _step++;
+          }
+          else
+          {
+               _step--;
+          }
+          if (_step > 7)
+          {
+               _step = 0;
+          }
+          if (_step < 0)
+          {
+               _step = 7;
+          }
           delay(1);
-          digitalWrite(Pin1, LOW);
-          digitalWrite(Pin2, LOW);
-          digitalWrite(Pin3, HIGH);
-          digitalWrite(Pin4, HIGH);
-          delay(1);
-          digitalWrite(Pin1, LOW);
-          digitalWrite(Pin2, LOW);
-          digitalWrite(Pin3, HIGH);
-          digitalWrite(Pin4, LOW);
-          delay(1);
-          digitalWrite(Pin1, LOW);
-          digitalWrite(Pin2, HIGH);
-          digitalWrite(Pin3, HIGH);
-          digitalWrite(Pin4, LOW);
-          delay(1);
-          digitalWrite(Pin1, LOW);
-          digitalWrite(Pin2, HIGH);
-          digitalWrite(Pin3, LOW);
-          digitalWrite(Pin4, LOW);
-          delay(1);
-          digitalWrite(Pin1, HIGH);
-          digitalWrite(Pin2, HIGH);
-          digitalWrite(Pin3, LOW);
-          digitalWrite(Pin4, LOW);
-          delay(1);
-          digitalWrite(Pin1, HIGH);
-          digitalWrite(Pin2, LOW);
-          digitalWrite(Pin3, LOW);
-          digitalWrite(Pin4, LOW);
-          delay(1);
-          digitalWrite(Pin1, HIGH);
-          digitalWrite(Pin2, LOW);
-          digitalWrite(Pin3, LOW);
-          digitalWrite(Pin4, HIGH);
-          delay(1);
-          digitalWrite(Pin1, LOW);
-          digitalWrite(Pin2, LOW);
-          digitalWrite(Pin3, LOW);
-          digitalWrite(Pin4, LOW);
-     }
+     } // for-loop end
      Serial.print("LockLater done!!! \n");
+     digitalWrite(LED_PIN_UNLOCK, 0);
 }
 
 /*   Keep sensoring
@@ -179,7 +147,6 @@ void steper_rotation()
      true for stable*/
 bool Sensoring()
 {
-#if SYSTEM // using FC-51
      for (int i = 0; i < 100; i++)
      {
           int localDect = digitalRead(A0);
@@ -189,36 +156,6 @@ bool Sensoring()
           }
      }
      return true;
-#else
-     accelgyro.getMotion6(&ax, &ay, &az, &gx, &gy, &gz);
-     int16_t ax_dif = abs(Pre_xyz[0] - ax);
-     int16_t ay_dif = abs(Pre_xyz[1] - ay);
-     int16_t az_dif = abs(Pre_xyz[2] - az);
-
-#if SHOW_ACC
-     Serial.print("ax=");
-     Serial.print(ax);
-     Serial.print("ay=");
-     Serial.print(ay);
-     Serial.print("az=");
-     Serial.print(az);
-     Serial.println("\n");
-#endif
-     Pre_xyz[0] = ax;
-     Pre_xyz[1] = ay;
-     Pre_xyz[2] = az;
-     // int16_t gx_dif = abs(Preg_xyz[0] - gx);
-     // int16_t gy_dif = abs(Preg_xyz[1] - gy);
-     // int16_t gz_dif = abs(Preg_xyz[2] - gz);
-     if (ax_dif > 1000 || ay_dif > 1000 || az_dif > 1000)
-     {
-          return false;
-     }
-     else // stable
-     {
-          return true;
-     }
-#endif
 }
 
 // uncomment "OUTPUT_READABLE_ACCELGYRO" if you want to see a tab-separated
@@ -246,19 +183,14 @@ void setup()
      // pinMode(LED_PIN, OUTPUT);
      pinMode(LED_PIN_BIKE_RUN, OUTPUT);
      pinMode(LED_PIN_UNLOCK, OUTPUT);
-#if SYSTEM
+
      pinMode(A0, INPUT);
      pinMode(A1, OUTPUT);
      pinMode(A2, OUTPUT);
      pinMode(11, OUTPUT);
      digitalWrite(A2, HIGH);
      digitalWrite(A1, LOW);
-#else
-     // Initial Pre_xyz
-     Pre_xyz[0] = 0.f;
-     Pre_xyz[1] = 0.f;
-     Pre_xyz[2] = 0.f;
-#endif
+
 // join I2C bus (I2Cdev library doesn't do this automatically)
 #if I2CDEV_IMPLEMENTATION == I2CDEV_ARDUINO_WIRE
      Wire.begin();
@@ -274,51 +206,44 @@ void setup()
      // RFID related code
      SPI.begin();
      rc522.PCD_Init();
-#if SYSTEM
-     Serial.println("Lock later setup done...");
-#else
-     // initialize device
-     Serial.println("Initializing I2C devices...");
-     accelgyro.initialize();
 
-     // verify connection
-     Serial.println("Testing device connections...");
-     Serial.println(accelgyro.testConnection() ? "MPU6050 connection successful" : "MPU6050 connection failed");
-#endif
+     Serial.println("Lock later setup done...");
 }
 
 void loop()
 {
      countI++;
-
-     digitalWrite(LED_PIN_UNLOCK, 0); // Unlock done
-
+     if (State)
+          digitalWrite(LED_PIN_BIKE_RUN, 1);
      // do sensor every 1000 count
-     if (countI % 500 == 0 && State)
+     if (countI % 250 == 0 && State)
      {
+          if (State)
+          {
+               digitalWrite(LED_PIN_BIKE_RUN, 1);
+          }
+          else
+          {
+               digitalWrite(LED_PIN_BIKE_RUN, 0);
+          }
           Serial.print("[LockLater]: BIKE MOVING\n");
-#if SYSTEM
           globalDect = digitalRead(A0);
           bool bStable = Sensoring();
-          
-#else
-          bool bStable = Sensoring();
-#endif
 
           if (!bStable) // BIKE_RUNNING
           {
-               digitalWrite(LED_PIN_BIKE_RUN, 1);
+               // digitalWrite(LED_PIN_BIKE_RUN, 1);
+               countI = 0;
                count = 0;
                State = 1;
+               digitalWrite(LED_PIN_BIKE_RUN, 1);
           }
           else if (bStable && State) // BIKE is STOP and may need LockLater
           {
                Serial.print("[LockLater]: BIKE might stop?\n");
                while (count < Wait)
                {
-#if SYSTEM
                     globalDect = digitalRead(A0);
-#endif
                     if (Sensoring())
                     {
                          count++;
@@ -332,24 +257,27 @@ void loop()
                     {
                          Serial.print("[LockLater]: Oh, you just chating. MOVE!!! MOVE!!! MOVE!!!\n");
                          State = 1;
+                         digitalWrite(LED_PIN_BIKE_RUN, 1);
                          break;
                     }
                }
-               if (count == Wait && State) // Stable last til counts done means "RUN-STOP",so BIKE STOP and needs LockLater
+               if (count == Wait && State) // Stable last til counts done means "RUN->STOP",so BIKE STOP and needs LockLater
                {
                     Serial.print("[LockLater]: Oh, you certainly STOP!!!\n");
                     digitalWrite(LED_PIN_BIKE_RUN, 0);
-                    digitalWrite(LED_PIN_UNLOCK, 1);
-                    steper_rotation();
+                    steper_rotation(true);
                     count = 0;
-                    State = 0;
                     countI = 0;
+                    State = 0;
+                    digitalWrite(LED_PIN_BIKE_RUN, 0);
                }
                else
                {
+                    // digitalWrite(LED_PIN_BIKE_RUN, 1);
                     count = 0;
-                    State = 1;
                     countI = 0;
+                    State = 1;
+                    digitalWrite(LED_PIN_BIKE_RUN, 1);
                }
           }
      }
@@ -389,7 +317,9 @@ void loop()
                }
                if (bAcc_aproval)
                {
-                    Unlock();
+                    steper_rotation(false);
+                    State = 1;
+                    digitalWrite(LED_PIN_BIKE_RUN, 1);
                }
                else
                {
